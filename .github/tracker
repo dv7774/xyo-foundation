@@ -1,0 +1,115 @@
+import requests
+import time
+from collections import defaultdict
+
+API_KEY = "YOUR_ETHERSCAN_API_KEY"
+
+WATCHLIST = [
+    "0x4aef1Fd68C9D0b17d85E0f4e90604F6c92883F18",
+    "0x82126CbdcF5E75f2EC31AeEA21D31408228fF11E",
+    "0xa1dfF30B0cA71B863E3A407d5a3f5A6e8C667015",
+    "0xc3534b9b40d8d69b2afbc374ec0388eff2ff199f",
+    "0x8f3cA07132Beee9c8Ae279FD5e2319796aC90837",
+    "0x9f09dd3b69a5912830d7b95a15eccff64b1c20dc",
+    "0x6A13941C75E1CE597C660b57df8ba5FDc9C77eBd"
+]
+
+XYO_CONTRACT = "0x55296f69f40Ea6d20E478533C15A6B08B654E758"
+
+BASE_URL = "https://api.etherscan.io/v2/api"
+
+def get_eth_balance(wallet):
+    params = {
+        "chainid": 1,
+        "module": "account",
+        "action": "balance",
+        "address": wallet,
+        "tag": "latest",
+        "apikey": API_KEY
+    }
+
+    r = requests.get(BASE_URL, params=params).json()
+
+    if r["status"] == "1":
+        eth = int(r["result"]) / 10**18
+        return eth
+
+    return 0
+
+
+def get_xyo_transactions(wallet):
+    params = {
+        "chainid": 1,
+        "module": "account",
+        "action": "tokentx",
+        "contractaddress": XYO_CONTRACT,
+        "address": wallet,
+        "sort": "desc",
+        "apikey": API_KEY
+    }
+
+    r = requests.get(BASE_URL, params=params).json()
+
+    if r["status"] == "1":
+        return r["result"]
+
+    return []
+
+
+def track_wallets():
+    wallet_links = defaultdict(list)
+
+    print("=" * 80)
+    print("DV7774 WALLET TRACKER")
+    print("=" * 80)
+
+    for wallet in WATCHLIST:
+
+        print(f"\nTRACKING: {wallet}")
+
+        eth_balance = get_eth_balance(wallet)
+
+        print(f"ETH Balance: {eth_balance:.6f} ETH")
+
+        txs = get_xyo_transactions(wallet)
+
+        print(f"XYO Transactions: {len(txs)}")
+
+        for tx in txs[:10]:
+
+            from_addr = tx["from"].lower()
+            to_addr = tx["to"].lower()
+
+            value = int(tx["value"]) / 10**18
+
+            print("-" * 60)
+            print(f"Hash: {tx['hash']}")
+            print(f"From: {from_addr}")
+            print(f"To: {to_addr}")
+            print(f"XYO: {value:,.2f}")
+
+            if from_addr in [w.lower() for w in WATCHLIST]:
+                wallet_links[from_addr].append(to_addr)
+
+            if to_addr in [w.lower() for w in WATCHLIST]:
+                wallet_links[to_addr].append(from_addr)
+
+        time.sleep(0.5)
+
+    print("\n")
+    print("=" * 80)
+    print("INTERSECTIONS")
+    print("=" * 80)
+
+    for wallet, links in wallet_links.items():
+
+        unique_links = set(links)
+
+        print(f"\n{wallet}")
+
+        for linked_wallet in unique_links:
+            print(f"  ↳ Connected To: {linked_wallet}")
+
+
+if __name__ == "__main__":
+    track_wallets()
